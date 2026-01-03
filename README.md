@@ -6,8 +6,8 @@ Tools for improving readability of FIX messages.
 
 - [Introduction](#introduction)
 - [Features](#features)
-- [Contributions](#contributions)
 - [Roadmap](#roadmap)
+- [Contributions](#contributions)
 
 # Introduction
 
@@ -31,6 +31,17 @@ Originally, I wanted to call the tool `hfix` in the spirit of e.g. `htop` and th
 
 None yet!
 
+# Roadmap
+
+1. Parse data read on stdin, identify FIX messages and print one tag per line on stdout. Non-FIX message data is passed through unprocessed.
+2. Add tag names to parsed tags and enum names, etc.
+3. Group messages in order chains to display the lifecycle of each order (from the initial New Order Single messages to the final Execution Report.) These messages are often scattered across a log and interleaved with each other and can thus be quite hard to look at - a lot of jumping around based on ClOrdID (11) OrderID (37).
+4. Hide often irrelevant tags such as BeginString (8), BodyLength (9), CheckSum (10) and specific tags per message. Show all tags by explicitly passing command line argument `-a`.
+5. Apply colours with some scheme to make it easier to read the FIX messages.
+6. Support custom FIX protocols by parsing the spec and generating a binary that "natively" understands e.g. custom tags.
+
 # Contributions
 
-# Roadmap
+You are welcome to create a Pull-Request or open an issue with suggestions for improvements.
+
+Changes are accepted solely at my discretion and I will focus on whether the changes are a good fit for the purpose and design of this crate.
