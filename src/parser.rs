@@ -222,7 +222,7 @@ impl<F: FixFormatter> Parser<F> {
 						bytes.push(self.field_delimiter);
 					}
 					bytes.extend(e.bytes());
-					bytes.push(byte);
+					bytes.push(byte); // Include the delimiter that caused the error.
 
 					return Err(FixError::NotFix(bytes));
 				}
@@ -258,7 +258,7 @@ impl<F: FixFormatter> Parser<F> {
 }
 
 pub fn process(input: &mut impl BufRead, output: &mut impl Write) -> Result<(), Error> {
-	Parser::<SimpleFormatter<BaseDictionary>>::new(b';').process(input, output)
+	Parser::<SimpleFormatter<BaseDictionary>>::default().process(input, output)
 }
 
 #[cfg(test)]
