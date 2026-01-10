@@ -9,16 +9,84 @@ const CHECK_SUM_TAG:           u32   = 10;
 
 #[derive(Debug)]
 struct Parser<F: FixFormatter> {
-	field_delimiter:     u8,
-	begin_string_parser: Option<BeginStringParser>,
-	field_parser:        Option<FieldParser>,
-	parsed_fields:       Vec<Field>,
-	formatter:           F,
+	field_delimiter: u8,
+	parser_state:    ParserState,
+	parsed_fields:   Vec<Field>,
+	formatter:       F,
 }
 
 impl<F: FixFormatter> Default for Parser<F> {
 	fn default() -> Self {
 		Self::new(SOH)
+	}
+}
+
+#[derive(Debug)]
+enum ParserState {
+	HeaderField {
+		parser: BeginStringParser,
+	},
+	Field {
+		parser: FieldParser,
+	},
+}
+
+impl ParserState {
+	fn new() -> Self {
+		Self::HeaderField {
+			parser: BeginStringParser::new(),
+		}
+	}
+
+	fn new_field() -> Self {
+		Self::Field {
+			parser: FieldParser::new(),
+		}
+	}
+
+	fn consume(&mut self, byte: u8) -> Result<(), FixError> {
+		match self {
+			ParserState::HeaderField { parser } => parser.consume(byte),
+			ParserState::Field       { parser } => {
+				match parser.consume(byte) {
+					Ok(()) => Ok(()),
+					Err(e) => {
+						self.reset();
+						Err(e)
+					}
+				}
+			}
+		}
+	}
+
+	fn reset(&mut self) {
+		*self = ParserState::new();
+	}
+
+	fn finish_field(&mut self) -> Result<Field, FixError> {
+		// Assume field is successfully completed.
+		let old_state = std::mem::replace(self, ParserState::new_field());
+
+		match old_state.complete() {
+			Ok(field) => {
+				if field.tag() == CHECK_SUM_TAG {
+					// End of message - reset to initial state.
+					self.reset();
+				}
+				Ok(field)
+			}
+			Err(e)    => {
+				self.reset();
+				Err(e)
+			}
+		}
+	}
+
+	fn complete(self) -> Result<Field, FixError> {
+		match self {
+			ParserState::HeaderField { parser } => parser.complete(),
+			ParserState::Field       { parser } => parser.complete(),
+		}
 	}
 }
 
@@ -91,10 +159,9 @@ impl<F: FixFormatter> Parser<F> {
 	fn new(field_delimiter: u8) -> Self {
 		Self {
 			field_delimiter,
-			begin_string_parser: Some(BeginStringParser::new()),
-			field_parser:        None,
-			parsed_fields:       Vec::new(),
-			formatter:           F::default(),
+			parser_state:  ParserState::new(),
+			parsed_fields: Vec::new(),
+			formatter:     F::default(),
 		}
 	}
 
@@ -133,77 +200,47 @@ impl<F: FixFormatter> Parser<F> {
 	#[inline]
 	fn consume(&mut self, byte: u8) -> Result<Option<Message>, FixError> {
 		if byte == self.field_delimiter {
-			if let Some(header_parser) = self.begin_string_parser.take() {
-				match header_parser.complete() {
-					Ok(header_field) => {
-						self.parsed_fields.push(header_field);
-						// Prepare to parse next field.
-						self.field_parser = Some(FieldParser::new());
-					}
-					Err(e) => {
-						// Reset to try again from the beginning.
-						self.begin_string_parser = Some(BeginStringParser::new());
+			match self.parser_state.finish_field() {
+				Ok(field) => {
+					let tag = field.tag();
+					self.parsed_fields.push(field);
 
-						let mut bytes = e.bytes();
-						bytes.push(byte);
-						return Err(FixError::NotFix(bytes));
+					if tag == CHECK_SUM_TAG {
+						let message = Message {
+							fields: self.parsed_fields.drain(..).collect(),
+						};
+						return Ok(Some(message));
 					}
 				}
-			}
-			else if let Some(field_parser) = self.field_parser.take() {
-				match field_parser.complete() {
-					Ok(field) => {
-						let tag = field.tag();
-						self.parsed_fields.push(field);
+				Err(e) => {
+					// Unwind all parsed fields so far.
+					let mut bytes = vec![];
 
-						if tag == CHECK_SUM_TAG {
-							// End of message - prepare for next message.
-							self.begin_string_parser = Some(BeginStringParser::new());
-
-							let message = Message {
-								fields: self.parsed_fields.drain(..).collect(),
-							};
-							return Ok(Some(message));
-						}
-						else {
-							// Prepare to parse next field.
-							self.field_parser = Some(FieldParser::new());
-						}
+					for field in self.parsed_fields.drain(..) {
+						let mut field_bytes = field.bytes();
+						bytes.append(&mut field_bytes);
+						bytes.push(self.field_delimiter);
 					}
-					Err(e) => {
-						// Reset to try again from the beginning.
-						self.begin_string_parser = Some(BeginStringParser::new());
+					bytes.extend(e.bytes());
+					bytes.push(byte);
 
-						// Unwind all parsed fields so far.
-						let mut bytes = vec![];
-
-						for field in &self.parsed_fields {
-							let mut field_bytes = field.bytes();
-							bytes.append(&mut field_bytes);
-							bytes.push(self.field_delimiter);
-						}
-						bytes.extend(e.bytes());
-
-						return Err(FixError::NotFix(bytes));
-					}
+					return Err(FixError::NotFix(bytes));
 				}
 			}
 		}
 		else {
-			if let Some(begin_string_parser) = &mut self.begin_string_parser {
-				begin_string_parser.consume(byte)?;
-			}
-			else if let Some(field_parser) = &mut self.field_parser {
-				match field_parser.consume(byte) {
-					Ok(()) => {}
-					Err(e) => {
-						// Reset to try again from the beginning.
-						self.begin_string_parser = Some(BeginStringParser::new());
-
+			match self.parser_state.consume(byte) {
+				Ok(()) => {}
+				Err(e) => {
+					if self.parsed_fields.is_empty() {
+						// No parsed fields yet - just return parser_state's error.
+						return Err(e);
+					}
+					else {
 						// Unwind all parsed fields so far.
 						let mut bytes = vec![];
 
-						for field in &self.parsed_fields {
+						for field in self.parsed_fields.drain(..) {
 							let mut field_bytes = field.bytes();
 							bytes.append(&mut field_bytes);
 							bytes.push(self.field_delimiter);

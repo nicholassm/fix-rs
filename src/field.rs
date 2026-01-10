@@ -98,7 +98,7 @@ impl FieldParser {
 	}
 
 	pub fn bytes(self) -> Vec<u8> {
-		let mut bytes = self.tag_bytes.clone();
+		let mut bytes = self.tag_bytes;
 		if self.state == State::ParseValue { 
 			bytes.push(TAG_DELIMITER);
 			bytes.extend(self.value_bytes.iter());
