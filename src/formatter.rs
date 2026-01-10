@@ -63,12 +63,12 @@ mod tests {
 		formatter.format(&message, &mut output).unwrap();
 		let output_str = String::from_utf8(output).unwrap();
 		insta::assert_snapshot!(&output_str, @r"
-   8 : BeginString  = FIX.4.2
-   9 : BodyLength   = 45
-  35 : MsgType      = D
-  49 : SenderCompID = SENDER
-  56 : TargetCompID = TARGET
-  ");
+		 8 : BeginString  = FIX.4.2
+		 9 : BodyLength   = 45
+		35 : MsgType      = D
+		49 : SenderCompID = SENDER
+		56 : TargetCompID = TARGET
+		");
 	}
 }
 

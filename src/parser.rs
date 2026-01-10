@@ -249,6 +249,43 @@ mod tests {
 		}
 	}
 
+	#[test]
+	fn fix_message() {
+		let input = b"8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+
+		let mut parser = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		let mut output = Vec::new();
+		parser.process(&mut &input[..], &mut output).unwrap();
+
+		insta::assert_snapshot!(to_str(&output), @r"
+		 8 : BeginString  = FIX.4.2
+		 9 : BodyLength   = 45
+		35 : MsgType      = D
+		49 : SenderCompID = SENDER
+		56 : TargetCompID = TARGET
+		10 : CheckSum     = 123
+		");
+	}
+
+	#[test]
+	fn embedded_fix_message() {
+		let input = b"2026-01-10 09:08:08.232 INFO Sending FIX: 8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+
+		let mut parser = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		let mut output = Vec::new();
+		parser.process(&mut &input[..], &mut output).unwrap();
+
+		insta::assert_snapshot!(to_str(&output), @r"
+		2026-01-10 09:08:8:08.8.232 INFO Sending FIX: 
+		     8 : BeginString  = FIX.4.2
+		     9 : BodyLength   = 45
+		    35 : MsgType      = D
+		    49 : SenderCompID = SENDER
+		    56 : TargetCompID = TARGET
+		    10 : CheckSum     = 123
+		");
+	}
+
 	fn to_str(bytes: &[u8]) -> &str {
 		str::from_utf8(bytes).unwrap()
 	}
