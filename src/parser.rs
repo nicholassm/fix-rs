@@ -4,7 +4,7 @@ use crate::{dictionary::BaseDictionary, field::{Field, FieldParser}, formatter::
 
 const SOH:                     u8    = b'\x01';
 const BEGIN_STRING:            u8    = b'8';
-const MAX_BEGIN_STRING_LENGTH: usize = 12;
+const MAX_BEGIN_STRING_LENGTH: usize = 20;
 const CHECK_SUM_TAG:           u32   = 10;
 
 #[derive(Debug)]
@@ -56,6 +56,13 @@ impl ParserState {
 					}
 				}
 			}
+		}
+	}
+
+	fn unwind(self) -> Vec<u8> {
+		match self {
+			ParserState::HeaderField { parser } => parser.field_parser.bytes(),
+			ParserState::Field       { parser } => parser.bytes(),
 		}
 	}
 
@@ -165,7 +172,7 @@ impl<F: FixFormatter> Parser<F> {
 		}
 	}
 
-	fn process(&mut self, input: &mut impl BufRead, output: &mut impl Write) -> Result<(), Error> {
+	fn process(mut self, input: &mut impl BufRead, output: &mut impl Write) -> Result<(), Error> {
 		// Read bytes and process one byte at a time as a FIX message can be split across multiple reads.
 		// Note also that a single read can also contain multiple FIX messages.
 
@@ -194,6 +201,31 @@ impl<F: FixFormatter> Parser<F> {
 			buffer = input.fill_buf()?;
 		}
 
+		self.end_of_input(output)?;
+
+		Ok(())
+	}
+
+	fn unwind_fields(&mut self) -> Vec<u8> {
+		// Unwind parsed fields.
+		let mut bytes = vec![];
+		for field in self.parsed_fields.drain(..) {
+			let mut field_bytes = field.bytes();
+			bytes.append(&mut field_bytes);
+			bytes.push(self.field_delimiter);
+		}
+		bytes
+	}
+
+	fn end_of_input(mut self, output: &mut impl Write) -> Result<(), Error> {
+		// Unwind any parsed fields.
+		let mut bytes = self.unwind_fields();
+		// Unwind current parser state.
+		let ongoing_bytes = self.parser_state.unwind();
+		bytes.extend(ongoing_bytes);
+
+		output.write_all(&bytes)?;
+
 		Ok(())
 	}
 
@@ -214,13 +246,7 @@ impl<F: FixFormatter> Parser<F> {
 				}
 				Err(e) => {
 					// Unwind all parsed fields so far.
-					let mut bytes = vec![];
-
-					for field in self.parsed_fields.drain(..) {
-						let mut field_bytes = field.bytes();
-						bytes.append(&mut field_bytes);
-						bytes.push(self.field_delimiter);
-					}
+					let mut bytes = self.unwind_fields();
 					bytes.extend(e.bytes());
 					bytes.push(byte); // Include the delimiter that caused the error.
 
@@ -238,13 +264,7 @@ impl<F: FixFormatter> Parser<F> {
 					}
 					else {
 						// Unwind all parsed fields so far.
-						let mut bytes = vec![];
-
-						for field in self.parsed_fields.drain(..) {
-							let mut field_bytes = field.bytes();
-							bytes.append(&mut field_bytes);
-							bytes.push(self.field_delimiter);
-						}
+						let mut bytes = self.unwind_fields();
 						bytes.extend(e.bytes());
 
 						return Err(FixError::NotFix(bytes));
@@ -269,17 +289,16 @@ mod tests {
 	fn not_fix() {
 		let inputs: Vec<&[u8]> = vec![
 			b"Hello, World!",
-			b"8=Hello World! ABC",
-			b"888=1238=Hello World! 8=FIX.4.2 xyzvwzabc",
+			b"8=Hello World!",
+			b"888=1238=Hello World! 8=FIX.4.2",
 			b"\x01\x01\x01\x01",
 			b"8=\x01=8\x01\x01\x01",
 			b"8=Hello \x01Worl\x01d! ABC",
 			b"8=HelloWorld1d! ABC",
 		];
 
-		let mut parser = Parser::<SimpleFormatter<BaseDictionary>>::default();
-
 		for input in inputs {
+			let parser     = Parser::<SimpleFormatter<BaseDictionary>>::default();
 			let mut output = Vec::new();
 			parser.process(&mut &input[..], &mut output).unwrap();
 			assert_eq!(to_str(&output), to_str(&input));
@@ -288,9 +307,25 @@ mod tests {
 
 	#[test]
 	fn fix_message() {
-		let input = b"8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+		let input      = b"8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+		let parser     = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		let mut output = Vec::new();
+		parser.process(&mut &input[..], &mut output).unwrap();
 
-		let mut parser = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		insta::assert_snapshot!(to_str(&output), @r"
+		 8 : BeginString  = FIX.4.2
+		 9 : BodyLength   = 45
+		35 : MsgType      = D
+		49 : SenderCompID = SENDER
+		56 : TargetCompID = TARGET
+		10 : CheckSum     = 123
+		");
+	}
+
+	#[test]
+	fn fix_message_with_custom_separator() {
+		let input      = b"8=FIX.4.2|9=45|35=D|49=SENDER|56=TARGET|10=123|";
+		let parser     = Parser::<SimpleFormatter<BaseDictionary>>::new(b'|');
 		let mut output = Vec::new();
 		parser.process(&mut &input[..], &mut output).unwrap();
 
@@ -306,9 +341,8 @@ mod tests {
 
 	#[test]
 	fn embedded_fix_message() {
-		let input = b"2026-01-10 09:08:08.232 INFO Sending FIX: 8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
-
-		let mut parser = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		let input      = b"2026-01-10 09:08:08.232 INFO Sending FIX: 8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+		let parser     = Parser::<SimpleFormatter<BaseDictionary>>::default();
 		let mut output = Vec::new();
 		parser.process(&mut &input[..], &mut output).unwrap();
 
