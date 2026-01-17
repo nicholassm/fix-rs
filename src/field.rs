@@ -43,82 +43,95 @@ impl Display for Field {
 }
 
 #[derive(Debug, PartialEq)]
-enum State {
-	ParseTag, ParseValue
+pub enum FieldParser {
+	ParseTag {
+		tag:   Vec<u8>
+	},
+	ParseValue{
+		tag:   Vec<u8>,
+		value: Vec<u8>
+	},
 }
 
-#[derive(Debug)]
-pub struct FieldParser {
-	state:       State,
-	tag_bytes:   Vec<u8>,
-	value_bytes: Vec<u8>,
+impl Default for FieldParser {
+	fn default() -> Self {
+		FieldParser::ParseTag {
+			tag: Vec::new()
+		}
+	}
 }
 
 impl FieldParser {
-	pub fn new() -> Self {
-		Self {
-			state:       State::ParseTag,
-			tag_bytes:   vec![],
-			value_bytes: vec![],
+	pub fn new () -> Self {
+		Self::default()
+	}
+
+	pub fn fresh(&self) -> bool {
+		match self {
+			FieldParser::ParseTag   { tag              } => tag.is_empty(),
+			FieldParser::ParseValue { tag: _, value: _ } => false,
 		}
 	}
 
-	#[inline]
-	pub fn fresh(&self) -> bool {
-		self.tag_bytes.is_empty() && self.state == State::ParseTag
-	}
-
-	#[inline]
 	pub fn consume(&mut self, byte: u8) -> Result<(), FixError> {
-		match self.state {
-			State::ParseTag => {
+		match self {
+			FieldParser::ParseTag { tag } => {
 				if byte == TAG_DELIMITER {
-					self.state = State::ParseValue;
+					let value = Vec::new();
+					// Move tag to next state.
+					let tag   = std::mem::take(tag);
+					*self     = FieldParser::ParseValue { tag, value };
 				}
 				else {
-					self.tag_bytes.push(byte);
-					if self.tag_bytes.len() > MAX_TAG_LENGTH || !byte.is_ascii_digit(){
-						return Err(FixError::NotFix(self.tag_bytes.clone()))
+					tag.push(byte);
+					if tag.len() > MAX_TAG_LENGTH || !byte.is_ascii_digit(){
+						let tag = std::mem::take(tag); // Resets parser.
+						return Err(FixError::NotFix(tag))
 					}
 				}
 			}
-			State::ParseValue => {
-				self.value_bytes.push(byte);
+			FieldParser::ParseValue { tag: _, value } => {
+				value.push(byte);
 			}
 		}
 		Ok(())
 	}
 
 	pub fn tag_bytes_count(&self) -> usize {
-		self.tag_bytes.len()
+		match self {
+			FieldParser::ParseTag   { tag           } => tag.len(),
+			FieldParser::ParseValue { tag, value: _ } => tag.len(),
+		}
 	}
 
 	pub fn value_bytes_count(&self) -> usize {
-		self.value_bytes.len()
+		match self {
+			FieldParser::ParseTag   { tag: _        } => 0,
+			FieldParser::ParseValue { tag: _, value } => value.len(),
+		}
 	}
 
 	pub fn bytes(self) -> Vec<u8> {
-		let mut bytes = self.tag_bytes;
-		if self.state == State::ParseValue { 
-			bytes.push(TAG_DELIMITER);
-			bytes.extend(self.value_bytes.iter());
+		match self {
+			FieldParser::ParseTag   { tag        } => tag,
+			FieldParser::ParseValue { tag, value } => {
+				let mut bytes = tag;
+				bytes.push(TAG_DELIMITER);
+				bytes.extend(value.iter());
+				bytes
+			}
 		}
-		bytes
 	}
 
 	pub fn complete(self) -> Result<Field, FixError> {
-		if self.state == State::ParseTag // Never read a value.
-		|| (self.state == State::ParseValue && self.value_bytes.is_empty()) { // Value is empty.
-			return Err(FixError::NotFix(self.bytes()))
-		}
-
-		let tag_string = String::from_utf8(self.tag_bytes.clone()).expect("Should only be ASCII digits.");
-		match tag_string.parse::<u32>() {
-			Ok(tag) => {
-				Ok(Field::new(tag, self.value_bytes))
-			}
-			Err(_) => {
-				Err(FixError::NotFix(self.tag_bytes))
+		match self {
+			FieldParser::ParseTag   { tag                } /* No value. */     => Err(FixError::NotFix(tag)),
+			FieldParser::ParseValue { ref tag, ref value } if value.is_empty() => Err(FixError::NotFix(self.bytes())),
+			FieldParser::ParseValue { tag, value }                             => {
+				// Parsing below cannot fail due to the check above.
+				let tag = String::from_utf8(tag).expect("Should only be ASCII digits.");
+				let tag = tag.parse::<u32>().expect("Should be a valid u32.");
+				Ok(Field::new(tag, value))
 			}
 		}
 	}

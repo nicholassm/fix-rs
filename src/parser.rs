@@ -47,15 +47,7 @@ impl ParserState {
 	fn consume(&mut self, byte: u8) -> Result<(), FixError> {
 		match self {
 			ParserState::HeaderField { parser } => parser.consume(byte),
-			ParserState::Field       { parser } => {
-				match parser.consume(byte) {
-					Ok(()) => Ok(()),
-					Err(e) => {
-						self.reset();
-						Err(e)
-					}
-				}
-			}
+			ParserState::Field       { parser } => parser.consume(byte),
 		}
 	}
 
@@ -295,6 +287,7 @@ mod tests {
 			b"8=\x01=8\x01\x01\x01",
 			b"8=Hello \x01Worl\x01d! ABC",
 			b"8=HelloWorld1d! ABC",
+			b"8=8=8=HelloWorld1d! ABC",
 		];
 
 		for input in inputs {
@@ -347,14 +340,14 @@ mod tests {
 		parser.process(&mut &input[..], &mut output).unwrap();
 
 		insta::assert_snapshot!(to_str(&output), @r"
-		2026-01-10 09:08:8:08.8.232 INFO Sending FIX: 
-		     8 : BeginString  = FIX.4.2
-		     9 : BodyLength   = 45
-		    35 : MsgType      = D
-		    49 : SenderCompID = SENDER
-		    56 : TargetCompID = TARGET
-		    10 : CheckSum     = 123
-		");
+  2026-01-10 09:08:08.232 INFO Sending FIX: 
+       8 : BeginString  = FIX.4.2
+       9 : BodyLength   = 45
+      35 : MsgType      = D
+      49 : SenderCompID = SENDER
+      56 : TargetCompID = TARGET
+      10 : CheckSum     = 123
+  ");
 	}
 
 	fn to_str(bytes: &[u8]) -> &str {
