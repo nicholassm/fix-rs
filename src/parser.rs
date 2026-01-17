@@ -215,6 +215,36 @@ impl<F: FixFormatter> Parser<F> {
 		Ok(())
 	}
 
+	#[inline]
+	fn consume(&mut self, byte: u8) -> Result<Option<Message>, FixError> {
+		if byte != self.field_delimiter {
+			self.parse_field(byte)
+		}
+		else {
+			self.finish_field()
+		}
+	}
+
+	#[inline]
+	fn parse_field(&mut self, byte: u8) -> Result<Option<Message>, FixError> {
+		match self.parser_state.consume(byte) {
+			Ok(()) => Ok(None),
+			Err(e) => {
+				if self.parsed_fields.is_empty() {
+					// No parsed fields yet - just return parser_state's error.
+					Err(e)
+				}
+				else {
+					// Unwind all parsed fields so far.
+					let mut bytes = self.unwind_fields();
+					bytes.extend(e.bytes());
+
+					Err(FixError::NotFix(bytes))
+				}
+			}
+		}
+	}
+
 	fn finish_field(&mut self) -> Result<Option<Message>, FixError> {
 		match self.parser_state.finish_field() {
 			Ok(field) => {
@@ -238,31 +268,6 @@ impl<F: FixFormatter> Parser<F> {
 				bytes.push(self.field_delimiter); // Include the delimiter that caused the error.
 
 				Err(FixError::NotFix(bytes))
-			}
-		}
-	}
-
-	#[inline]
-	fn consume(&mut self, byte: u8) -> Result<Option<Message>, FixError> {
-		if byte == self.field_delimiter {
-			self.finish_field()
-		}
-		else {
-			match self.parser_state.consume(byte) {
-				Ok(()) => Ok(None),
-				Err(e) => {
-					if self.parsed_fields.is_empty() {
-						// No parsed fields yet - just return parser_state's error.
-						Err(e)
-					}
-					else {
-						// Unwind all parsed fields so far.
-						let mut bytes = self.unwind_fields();
-						bytes.extend(e.bytes());
-
-						Err(FixError::NotFix(bytes))
-					}
-				}
 			}
 		}
 	}
