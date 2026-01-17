@@ -1,8 +1,7 @@
 use std::{io::{BufRead, Error, Write}, vec};
 
-use crate::{dictionary::BaseDictionary, field::{Field, FieldParser}, formatter::{FixFormatter, SimpleFormatter}};
+use crate::{args::Args, dictionary::BaseDictionary, field::{Field, FieldParser}, formatter::{FixFormatter, SimpleFormatter}};
 
-const SOH:                     u8    = b'\x01';
 const BEGIN_STRING:            u8    = b'8';
 const MAX_BEGIN_STRING_LENGTH: usize = 20;
 const CHECK_SUM_TAG:           u32   = 10;
@@ -13,12 +12,6 @@ struct Parser<F: FixFormatter> {
 	parser_state:    ParserState,
 	parsed_fields:   Vec<Field>,
 	formatter:       F,
-}
-
-impl<F: FixFormatter> Default for Parser<F> {
-	fn default() -> Self {
-		Self::new(SOH)
-	}
 }
 
 #[derive(Debug)]
@@ -155,7 +148,8 @@ impl FixError {
 }
 
 impl<F: FixFormatter> Parser<F> {
-	fn new(field_delimiter: u8) -> Self {
+	fn new(args: Args) -> Self {
+		let field_delimiter = args.field_separator as u8;
 		Self {
 			field_delimiter,
 			parser_state:  ParserState::new(),
@@ -269,13 +263,15 @@ impl<F: FixFormatter> Parser<F> {
 	}
 }
 
-pub fn process(input: &mut impl BufRead, output: &mut impl Write) -> Result<(), Error> {
-	Parser::<SimpleFormatter<BaseDictionary>>::default().process(input, output)
+pub fn process(input: &mut impl BufRead, output: &mut impl Write, args: Args) -> Result<(), Error> {
+	let parser = Parser::<SimpleFormatter<BaseDictionary>>::new(args);
+	parser.process(input, output)
 }
 
 #[cfg(test)]
 mod tests {
 	use super::*;
+	const COMMAND_NAME: &str  = "nfix";
 
 	#[test]
 	fn not_fix() {
@@ -291,7 +287,7 @@ mod tests {
 		];
 
 		for input in inputs {
-			let parser     = Parser::<SimpleFormatter<BaseDictionary>>::default();
+			let parser     = create_default_parser();
 			let mut output = Vec::new();
 			parser.process(&mut &input[..], &mut output).unwrap();
 			assert_eq!(to_str(&output), to_str(&input));
@@ -301,7 +297,7 @@ mod tests {
 	#[test]
 	fn fix_message() {
 		let input      = b"8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
-		let parser     = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		let parser     = create_default_parser();
 		let mut output = Vec::new();
 		parser.process(&mut &input[..], &mut output).unwrap();
 
@@ -318,7 +314,7 @@ mod tests {
 	#[test]
 	fn fix_message_with_custom_separator() {
 		let input      = b"8=FIX.4.2|9=45|35=D|49=SENDER|56=TARGET|10=123|";
-		let parser     = Parser::<SimpleFormatter<BaseDictionary>>::new(b'|');
+		let parser     = create_parser_with_args(&[COMMAND_NAME, "-s", "|"]);
 		let mut output = Vec::new();
 		parser.process(&mut &input[..], &mut output).unwrap();
 
@@ -335,7 +331,7 @@ mod tests {
 	#[test]
 	fn embedded_fix_message() {
 		let input      = b"2026-01-10 09:08:08.232 INFO Sending FIX: 8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
-		let parser     = Parser::<SimpleFormatter<BaseDictionary>>::default();
+		let parser     = create_default_parser();
 		let mut output = Vec::new();
 		parser.process(&mut &input[..], &mut output).unwrap();
 
@@ -348,6 +344,20 @@ mod tests {
 		    56 : TargetCompID = TARGET
 		    10 : CheckSum     = 123
 		");
+	}
+
+	fn create_default_parser() -> Parser<SimpleFormatter<BaseDictionary>> {
+		create_parser_with_args(&[COMMAND_NAME])
+	}
+
+	fn create_parser_with_args(args: &[&str]) -> Parser<SimpleFormatter<BaseDictionary>> {
+		use clap::Parser;
+		let args = Args::parse_from(args);
+		create_parser(args)
+	}
+
+	fn create_parser(args: Args) -> Parser<SimpleFormatter<BaseDictionary>> {
+		Parser::<SimpleFormatter<BaseDictionary>>::new(args)
 	}
 
 	fn to_str(bytes: &[u8]) -> &str {

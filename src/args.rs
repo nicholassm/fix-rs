@@ -1,0 +1,14 @@
+use clap::Parser;
+
+const SOH: char = '\x01';
+
+/// Parse FIX messages on stdin and output on stdout.
+#[derive(Parser, Debug)]
+#[command(version, about, long_about = None)]
+pub struct Args {
+	/// Separator character between fields.
+	/// Only ascii values are supported.
+	/// Defaults to SOH ('\x01').
+	#[arg(short='s', long, default_value_t = SOH)]
+	pub field_separator: char,
+}

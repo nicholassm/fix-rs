@@ -30,6 +30,7 @@ Originally, I wanted to call the tool `hfix` in the spirit of e.g. `htop` and th
 # Features
 
 1. Parse data read on stdin, identify FIX messages and print one tag per line on stdout. Non-FIX message data is passed through unprocessed.
+2. Specify non-default field separator with the command line argument `-s`.
 
 # Roadmap
 

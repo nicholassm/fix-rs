@@ -1,8 +1,13 @@
+use crate::args::Args;
+use clap::Parser;
+
 mod parser;
 mod field;
 mod formatter;
 mod dictionary;
+mod args;
 
 fn main() -> std::io::Result<()> {
-	parser::process(&mut std::io::stdin().lock(), &mut std::io::stdout())
+	let args = Args::parse();
+	parser::process(&mut std::io::stdin().lock(), &mut std::io::stdout(), args)
 }
