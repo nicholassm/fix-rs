@@ -34,13 +34,13 @@ Download the code and run
 
     cargo build --release
 
-Copy it to /usr/bin
+Copy it to `/usr/local/bin` or similar depending on your OS.
 
 To get help and see available options, run
 
     nfix -h
 
-Now use it:
+Example usage:
 
     head -1 test-data/messages.txt | nfix -s ';'
         2020/03/02-06:14:36,393 INFO :: TracingIncomingMessage[HFE_UAT_EQ_US]:
