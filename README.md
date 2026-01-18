@@ -5,6 +5,7 @@ Tools for improving readability of FIX messages.
 # Contents
 
 - [Introduction](#introduction)
+- [Getting Started](#getting-started)
 - [Features](#features)
 - [Roadmap](#roadmap)
 - [Contributions](#contributions)
@@ -26,6 +27,52 @@ I.e. it will focus on making FIX messages easier to read by splitting tags on se
 The tool command will be `nfix` and the idea is that you can say e.g. *grep'n'fix* when piping results from `grep` into `nfix`.
 
 Originally, I wanted to call the tool `hfix` in the spirit of e.g. `htop` and the `h` would be for "human" but when I learned that the `h` in `htop` is short for "Hisham" ([htop](https://htop.dev/) was written by [Hisham Muhammad](https://hisham.hm/)) then what the heck - it's also called `nfix` because my first name is Nicholas. :-)
+
+# Getting Started
+
+Download the code and run
+
+    cargo build --release
+
+Copy it to /usr/bin
+
+To get help and see available options, run
+
+    nfix -h
+
+Now use it:
+
+    head -1 test-data/messages.txt | nfix -s ';'
+        2020/03/02-06:14:36,393 INFO :: TracingIncomingMessage[HFE_UAT_EQ_US]:
+        35 : MsgType      = D
+        49 : SenderCompID = IREACH
+        56 : TargetCompID = MLPT
+       115                = HARRISEUAP
+        34 : MsgSeqNum    = 988
+        52 : SendingTime  = 20200302-11:14:36.393
+     75205                = 2
+        11                = IREACH_t182_LLOYLN.nx83e.j#a1
+        63                = 0
+        21                = 2
+      6401                = 45
+      6408                = M
+      9682                = BofAGlobalAlgoFixSpec_ProductionVersionJan2020
+        55                = LLOYLN
+        48                = 0870612
+        22                = 2
+       167                = CS
+       207                = XLON
+        54                = 1
+        60                = 20200302-11:14:36
+        38                = 1000
+        40                = 2
+        44                = 59.73
+        15                = GBp
+        59                = 0
+      8202                = PCT
+      8204                = ABS
+      8205                = FAV
+      8206                = ATS
 
 # Features
 
