@@ -4,6 +4,7 @@ use clap::Parser;
 mod parser;
 mod formatter;
 mod dictionary;
+mod filter;
 mod args;
 
 fn main() -> std::io::Result<()> {

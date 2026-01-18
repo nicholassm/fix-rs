@@ -1,14 +1,15 @@
+use crate::parser::tag::Tag;
 
 pub trait Dictionary: Default {
-	fn tag_name(&self, tag: u32) -> Option<&'static str>;
+	fn tag_name(&self, tag: Tag) -> Option<&'static str>;
 }
 
 #[derive(Debug, Default)]
 pub struct BaseDictionary;
 
 impl Dictionary for BaseDictionary {
-	fn tag_name(&self, tag: u32) -> Option<&'static str> {
-		match tag {
+	fn tag_name(&self, tag: Tag) -> Option<&'static str> {
+		match tag.number() {
 			8  => Some("BeginString"),
 			9  => Some("BodyLength"),
 			10 => Some("CheckSum"),

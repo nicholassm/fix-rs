@@ -1,14 +1,17 @@
 use std::{io::{BufRead, Error, Write}, vec};
 
-use crate::{args::Args, dictionary::BaseDictionary, formatter::{FixFormatter, SimpleFormatter}, parser::{field::Field, message::Message, state::{CHECK_SUM_TAG, ParserState}}};
+use crate::{args::Args, dictionary::BaseDictionary, filter::BaseFilter, formatter::{FixFormatter, SimpleFormatter}, parser::{field::Field, message::Message, state::{CHECK_SUM, ParserState}}};
 
 pub(crate) mod field;
 pub(crate) mod state;
 pub(crate) mod begin_string;
+pub(crate) mod tag;
 pub(crate) mod message;
 
+pub const COMMAND_NAME: &str  = "nfix";
+
 pub fn process(input: &mut impl BufRead, output: &mut impl Write, args: Args) -> Result<(), Error> {
-	let parser = Parser::<SimpleFormatter<BaseDictionary>>::new(args);
+	let parser = Parser::<SimpleFormatter<BaseDictionary, BaseFilter>>::new(args);
 	parser.process(input, output)
 }
 
@@ -20,7 +23,7 @@ struct Parser<F: FixFormatter> {
 	formatter:       F,
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum FixError {
 	NotFixStart,
 	NotFix(Vec<u8>),
@@ -42,7 +45,7 @@ impl<F: FixFormatter> Parser<F> {
 			field_delimiter,
 			parser_state:  ParserState::new(),
 			parsed_fields: Vec::new(),
-			formatter:     F::default(),
+			formatter:     F::new(&args),
 		}
 	}
 
@@ -139,7 +142,7 @@ impl<F: FixFormatter> Parser<F> {
 				let tag = field.tag();
 				self.parsed_fields.push(field);
 
-				if tag == CHECK_SUM_TAG {
+				if tag.number() == CHECK_SUM {
 					let message = Message::new(self.parsed_fields.drain(..).collect());
 					Ok(Some(message))
 				}
@@ -161,8 +164,9 @@ impl<F: FixFormatter> Parser<F> {
 
 #[cfg(test)]
 mod tests {
+	use crate::filter::BaseFilter;
+
 	use super::*;
-	const COMMAND_NAME: &str  = "nfix";
 
 	#[test]
 	fn not_fix() {
@@ -193,6 +197,20 @@ mod tests {
 		parser.process(&mut &input[..], &mut output).unwrap();
 
 		insta::assert_snapshot!(to_str(&output), @r"
+		35 : MsgType      = D
+		49 : SenderCompID = SENDER
+		56 : TargetCompID = TARGET
+		");
+	}
+
+	#[test]
+	fn fix_message_with_all_fields() {
+		let input      = b"8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+		let parser     = create_parser_with_args(&[COMMAND_NAME, "-a"]);
+		let mut output = Vec::new();
+		parser.process(&mut &input[..], &mut output).unwrap();
+
+		insta::assert_snapshot!(to_str(&output), @r"
 		 8 : BeginString  = FIX.4.2
 		 9 : BodyLength   = 45
 		35 : MsgType      = D
@@ -206,6 +224,20 @@ mod tests {
 	fn fix_message_with_custom_separator() {
 		let input      = b"8=FIX.4.2|9=45|35=D|49=SENDER|56=TARGET|10=123|";
 		let parser     = create_parser_with_args(&[COMMAND_NAME, "-s", "|"]);
+		let mut output = Vec::new();
+		parser.process(&mut &input[..], &mut output).unwrap();
+
+		insta::assert_snapshot!(to_str(&output), @r"
+		35 : MsgType      = D
+		49 : SenderCompID = SENDER
+		56 : TargetCompID = TARGET
+		");
+	}
+
+	#[test]
+	fn fix_message_with_custom_separator_with_all_fields() {
+		let input      = b"8=FIX.4.2|9=45|35=D|49=SENDER|56=TARGET|10=123|";
+		let parser     = create_parser_with_args(&[COMMAND_NAME, "-s", "|", "-a"]);
 		let mut output = Vec::new();
 		parser.process(&mut &input[..], &mut output).unwrap();
 
@@ -228,6 +260,21 @@ mod tests {
 
 		insta::assert_snapshot!(to_str(&output), @r"
 		2026-01-10 09:08:08.232 INFO Sending FIX: 
+		    35 : MsgType      = D
+		    49 : SenderCompID = SENDER
+		    56 : TargetCompID = TARGET
+		");
+	}
+
+	#[test]
+	fn embedded_fix_message_with_all_fields() {
+		let input      = b"2026-01-10 09:08:08.232 INFO Sending FIX: 8=FIX.4.2\x019=45\x0135=D\x0149=SENDER\x0156=TARGET\x0110=123\x01";
+		let parser     = create_parser_with_args(&[COMMAND_NAME, "-a"]);
+		let mut output = Vec::new();
+		parser.process(&mut &input[..], &mut output).unwrap();
+
+		insta::assert_snapshot!(to_str(&output), @r"
+		2026-01-10 09:08:08.232 INFO Sending FIX: 
 		     8 : BeginString  = FIX.4.2
 		     9 : BodyLength   = 45
 		    35 : MsgType      = D
@@ -236,19 +283,18 @@ mod tests {
 		    10 : CheckSum     = 123
 		");
 	}
-
-	fn create_default_parser() -> Parser<SimpleFormatter<BaseDictionary>> {
+	fn create_default_parser() -> Parser<SimpleFormatter<BaseDictionary, BaseFilter>> {
 		create_parser_with_args(&[COMMAND_NAME])
 	}
 
-	fn create_parser_with_args(args: &[&str]) -> Parser<SimpleFormatter<BaseDictionary>> {
+	fn create_parser_with_args(args: &[&str]) -> Parser<SimpleFormatter<BaseDictionary, BaseFilter>> {
 		use clap::Parser;
 		let args = Args::parse_from(args);
 		create_parser(args)
 	}
 
-	fn create_parser(args: Args) -> Parser<SimpleFormatter<BaseDictionary>> {
-		Parser::<SimpleFormatter<BaseDictionary>>::new(args)
+	fn create_parser(args: Args) -> Parser<SimpleFormatter<BaseDictionary, BaseFilter>> {
+		Parser::<SimpleFormatter<BaseDictionary, BaseFilter>>::new(args)
 	}
 
 	fn to_str(bytes: &[u8]) -> &str {

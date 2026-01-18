@@ -1,20 +1,18 @@
-use std::fmt::Display;
-
-use crate::parser::FixError;
+use crate::parser::{FixError, tag::Tag};
 
 const TAG_DELIMITER:  u8    = b'=';
 const MAX_TAG_LENGTH: usize = 6;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Field {
-	tag: u32,
+	tag: Tag,
 	/// Bytes for the value.
 	/// (Does not include the field delimiter.)
 	value_bytes: Vec<u8>,
 }
 
 impl Field {
-	pub fn new(tag: u32, value_bytes: Vec<u8>) -> Self {
+	pub fn new(tag: Tag, value_bytes: Vec<u8>) -> Self {
 		Self {
 			tag, value_bytes
 		}
@@ -31,14 +29,8 @@ impl Field {
 		&self.value_bytes
 	}
 	
-	pub fn tag(&self) -> u32 {
+	pub fn tag(&self) -> Tag {
 		self.tag
-	}
-}
-
-impl Display for Field {
-	fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-		write!(f, "{}={}", self.tag, String::from_utf8_lossy(&self.value_bytes))
 	}
 }
 
@@ -128,9 +120,7 @@ impl FieldParser {
 			FieldParser::ParseTag   { tag                } /* No value. */     => Err(FixError::NotFix(tag)),
 			FieldParser::ParseValue { ref tag, ref value } if value.is_empty() => Err(FixError::NotFix(self.bytes())),
 			FieldParser::ParseValue { tag, value }                             => {
-				// Parsing below cannot fail due to the check above.
-				let tag = String::from_utf8(tag).expect("Should only be ASCII digits.");
-				let tag = tag.parse::<u32>().expect("Should be a valid u32.");
+				let tag = Tag::try_from(tag)?;
 				Ok(Field::new(tag, value))
 			}
 		}

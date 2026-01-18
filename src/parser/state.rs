@@ -1,6 +1,6 @@
 use crate::parser::{FixError, begin_string::BeginStringParser, field::{Field, FieldParser}};
 
-pub const CHECK_SUM_TAG: u32 = 10;
+pub const CHECK_SUM: u32 = 10;
 
 #[derive(Debug)]
 pub enum ParserState {
@@ -49,7 +49,7 @@ impl ParserState {
 
 		match old_state.complete() {
 			Ok(field) => {
-				if field.tag() == CHECK_SUM_TAG {
+				if field.tag().number() == CHECK_SUM {
 					// End of message - reset to initial state.
 					self.reset();
 				}
