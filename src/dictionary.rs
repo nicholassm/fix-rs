@@ -11,12 +11,12 @@ impl Dictionary for BaseDictionary {
 		match tag {
 			8  => Some("BeginString"),
 			9  => Some("BodyLength"),
+			10 => Some("CheckSum"),
+			34 => Some("MsgSeqNum"),
 			35 => Some("MsgType"),
 			49 => Some("SenderCompID"),
-			56 => Some("TargetCompID"),
-			34 => Some("MsgSeqNum"),
 			52 => Some("SendingTime"),
-			10 => Some("CheckSum"),
+			56 => Some("TargetCompID"),
 			_  => None,
 		}
 	}

@@ -1,10 +1,16 @@
 use std::{io::{BufRead, Error, Write}, vec};
 
-use crate::{args::Args, dictionary::BaseDictionary, field::{Field, FieldParser}, formatter::{FixFormatter, SimpleFormatter}};
+use crate::{args::Args, dictionary::BaseDictionary, formatter::{FixFormatter, SimpleFormatter}, parser::{field::Field, message::Message, state::{CHECK_SUM_TAG, ParserState}}};
 
-const BEGIN_STRING:            u8    = b'8';
-const MAX_BEGIN_STRING_LENGTH: usize = 20;
-const CHECK_SUM_TAG:           u32   = 10;
+pub(crate) mod field;
+pub(crate) mod state;
+pub(crate) mod begin_string;
+pub(crate) mod message;
+
+pub fn process(input: &mut impl BufRead, output: &mut impl Write, args: Args) -> Result<(), Error> {
+	let parser = Parser::<SimpleFormatter<BaseDictionary>>::new(args);
+	parser.process(input, output)
+}
 
 #[derive(Debug)]
 struct Parser<F: FixFormatter> {
@@ -12,124 +18,6 @@ struct Parser<F: FixFormatter> {
 	parser_state:    ParserState,
 	parsed_fields:   Vec<Field>,
 	formatter:       F,
-}
-
-#[derive(Debug)]
-enum ParserState {
-	HeaderField {
-		parser: BeginStringParser,
-	},
-	Field {
-		parser: FieldParser,
-	},
-}
-
-impl ParserState {
-	fn new() -> Self {
-		Self::HeaderField {
-			parser: BeginStringParser::new(),
-		}
-	}
-
-	fn new_field() -> Self {
-		Self::Field {
-			parser: FieldParser::new(),
-		}
-	}
-
-	fn consume(&mut self, byte: u8) -> Result<(), FixError> {
-		match self {
-			ParserState::HeaderField { parser } => parser.consume(byte),
-			ParserState::Field       { parser } => parser.consume(byte),
-		}
-	}
-
-	fn unwind(self) -> Vec<u8> {
-		match self {
-			ParserState::HeaderField { parser } => parser.field_parser.bytes(),
-			ParserState::Field       { parser } => parser.bytes(),
-		}
-	}
-
-	fn reset(&mut self) {
-		*self = ParserState::new();
-	}
-
-	fn finish_field(&mut self) -> Result<Field, FixError> {
-		// Assume field is successfully completed.
-		let old_state = std::mem::replace(self, ParserState::new_field());
-
-		match old_state.complete() {
-			Ok(field) => {
-				if field.tag() == CHECK_SUM_TAG {
-					// End of message - reset to initial state.
-					self.reset();
-				}
-				Ok(field)
-			}
-			Err(e)    => {
-				self.reset();
-				Err(e)
-			}
-		}
-	}
-
-	fn complete(self) -> Result<Field, FixError> {
-		match self {
-			ParserState::HeaderField { parser } => parser.complete(),
-			ParserState::Field       { parser } => parser.complete(),
-		}
-	}
-}
-
-#[derive(Debug)]
-struct BeginStringParser {
-	field_parser: FieldParser,
-}
-
-impl BeginStringParser {
-	fn new() -> Self {
-		Self {
-			field_parser: FieldParser::new(),
-		}
-	}
-
-	fn consume(&mut self, byte: u8) -> Result<(), FixError> {
-		if self.field_parser.fresh() && byte != BEGIN_STRING {
-			return Err(FixError::NotFixStart);
-		}
-		self.field_parser.consume(byte)?;
-		
-		if self.field_parser.tag_bytes_count() > 1 // Only one tag byte ('8') is allowed.
-		|| self.field_parser.value_bytes_count() > MAX_BEGIN_STRING_LENGTH {
-			let old_field_parser = std::mem::replace(&mut self.field_parser, FieldParser::new());
-			return Err(FixError::NotFix(old_field_parser.bytes()));
-		}
-		Ok(())
-	}
-
-	fn complete(self) -> Result<Field, FixError> {
-		self.field_parser.complete()
-	}
-}
-
-pub struct Message {
-	fields: Vec<Field>,
-}
-
-impl Message {
-	pub fn new(fields: Vec<Field>) -> Self {
-		Self { fields }
-	}
-}
-
-impl<'a> IntoIterator for &'a Message {
-	type IntoIter = std::slice::Iter<'a, Field>;
-	type Item     = &'a Field;
-
-	fn into_iter(self) -> std::slice::Iter<'a, Field> {
-		self.fields.iter()
-	}
 }
 
 #[derive(Debug)]
@@ -252,9 +140,7 @@ impl<F: FixFormatter> Parser<F> {
 				self.parsed_fields.push(field);
 
 				if tag == CHECK_SUM_TAG {
-					let message = Message {
-						fields: self.parsed_fields.drain(..).collect(),
-					};
+					let message = Message::new(self.parsed_fields.drain(..).collect());
 					Ok(Some(message))
 				}
 				else {
@@ -271,11 +157,6 @@ impl<F: FixFormatter> Parser<F> {
 			}
 		}
 	}
-}
-
-pub fn process(input: &mut impl BufRead, output: &mut impl Write, args: Args) -> Result<(), Error> {
-	let parser = Parser::<SimpleFormatter<BaseDictionary>>::new(args);
-	parser.process(input, output)
 }
 
 #[cfg(test)]

@@ -1,6 +1,6 @@
 use std::io::Write;
 
-use crate::{dictionary::Dictionary, parser::Message};
+use crate::{dictionary::Dictionary, parser::message::Message};
 
 pub trait FixFormatter: Default {
 	fn format(&self, message: &Message, output: &mut impl Write) -> std::io::Result<()>;
@@ -39,8 +39,7 @@ impl<D: Dictionary> FixFormatter for SimpleFormatter<D> {
 mod tests {
 	use super::*;
 	use crate::dictionary::BaseDictionary;
-	use crate::field::Field;
-	use crate::parser::Message;
+	use crate::parser::field::Field;
 
 	/// Helper for creating a field from tag and str.
 	fn to_field(tag: u32, value: &str) -> Field {

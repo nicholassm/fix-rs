@@ -2,7 +2,6 @@ use crate::args::Args;
 use clap::Parser;
 
 mod parser;
-mod field;
 mod formatter;
 mod dictionary;
 mod args;
