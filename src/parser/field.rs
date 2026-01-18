@@ -60,8 +60,8 @@ impl FieldParser {
 
 	pub fn fresh(&self) -> bool {
 		match self {
-			FieldParser::ParseTag   { tag              } => tag.is_empty(),
-			FieldParser::ParseValue { tag: _, value: _ } => false,
+			FieldParser::ParseTag   { tag } => tag.is_empty(),
+			FieldParser::ParseValue { ..  } => false,
 		}
 	}
 
@@ -82,7 +82,7 @@ impl FieldParser {
 					}
 				}
 			}
-			FieldParser::ParseValue { tag: _, value } => {
+			FieldParser::ParseValue { value, .. } => {
 				value.push(byte);
 			}
 		}
@@ -91,15 +91,15 @@ impl FieldParser {
 
 	pub fn tag_bytes_count(&self) -> usize {
 		match self {
-			FieldParser::ParseTag   { tag           } => tag.len(),
-			FieldParser::ParseValue { tag, value: _ } => tag.len(),
+			FieldParser::ParseTag   { tag     } => tag.len(),
+			FieldParser::ParseValue { tag, .. } => tag.len(),
 		}
 	}
 
 	pub fn value_bytes_count(&self) -> usize {
 		match self {
-			FieldParser::ParseTag   { tag: _        } => 0,
-			FieldParser::ParseValue { tag: _, value } => value.len(),
+			FieldParser::ParseTag   { ..        } => 0,
+			FieldParser::ParseValue { value, .. } => value.len(),
 		}
 	}
 

@@ -16,16 +16,10 @@ pub struct SimpleFormatter<D: Dictionary, F: Filter> {
 
 impl<D: Dictionary, F: Filter> FixFormatter for SimpleFormatter<D, F> {
 	fn new(args: &Args) -> Self {
-		let Self {
-			show_all_fields: _,
-			dictionary,
-			filter
-		} = Self::default();
-
 		Self {
 			show_all_fields: args.show_all_fields,
-			dictionary,
-			filter,
+			dictionary:      D::default(),
+			filter:          F::default(),
 		}
 	}
 

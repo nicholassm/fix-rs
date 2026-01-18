@@ -10,9 +10,6 @@ pub struct BaseFilter;
 impl Filter for BaseFilter {
 	fn relevant(&self, tag: Tag) -> bool {
 		// Expand on this.
-		match tag.number() {
-			8 | 9 | 10 => false,
-			_ => true,
-		}
+		!matches!(tag.number(), 8 | 9 | 10)
 	}
 }
