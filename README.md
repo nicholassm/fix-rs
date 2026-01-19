@@ -28,6 +28,10 @@ The tool command will be `nfix` and the idea is that you can say e.g. *grep'n'fi
 
 Originally, I wanted to call the tool `hfix` in the spirit of e.g. `htop` and the `h` would be for "human" but when I learned that the `h` in `htop` is short for "Hisham" ([htop](https://htop.dev/) was written by [Hisham Muhammad](https://hisham.hm/)) then what the heck - it's also called `nfix` because my first name is Nicholas. :-)
 
+## AI
+
+The code is carefully crafted by me with only a bit of AI intellisense (which was carefully reviewed).
+
 # Getting Started
 
 Download the code and run
