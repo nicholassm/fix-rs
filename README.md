@@ -47,36 +47,36 @@ To get help and see available options, run
 Example usage:
 
     head -1 test-data/messages.txt | nfix -s ';'
-        2020/03/02-06:14:36,393 INFO :: TracingIncomingMessage[HFE_UAT_EQ_US]:
-        35 : MsgType      = D
-        49 : SenderCompID = IREACH
-        56 : TargetCompID = MLPT
-       115                = HARRISEUAP
-        34 : MsgSeqNum    = 988
-        52 : SendingTime  = 20200302-11:14:36.393
-     75205                = 2
-        11                = IREACH_t182_LLOYLN.nx83e.j#a1
-        63                = 0
-        21                = 2
-      6401                = 45
-      6408                = M
-      9682                = BofAGlobalAlgoFixSpec_ProductionVersionJan2020
-        55                = LLOYLN
-        48                = 0870612
-        22                = 2
-       167                = CS
-       207                = XLON
-        54                = 1
-        60                = 20200302-11:14:36
-        38                = 1000
-        40                = 2
-        44                = 59.73
-        15                = GBp
-        59                = 0
-      8202                = PCT
-      8204                = ABS
-      8205                = FAV
-      8206                = ATS
+    2020/03/02-06:14:36,393 INFO :: TracingIncomingMessage[HFE_UAT_EQ_US]:
+        35 : MsgType          = D
+        49 : SenderCompID     = IREACH
+        56 : TargetCompID     = MLPT
+       115 : OnBehalfOfCompID = HARRISEUAP
+        34 : MsgSeqNum        = 988
+        52 : SendingTime      = 20200302-11:14:36.393
+     75205                    = 2
+        11 : ClOrdID          = IREACH_t182_LLOYLN.nx83e.j#a1
+        63 : SettlmntTyp      = 0
+        21 : HandlInst        = 2
+      6401                    = 45
+      6408                    = M
+      9682                    = BofAGlobalAlgoFixSpec_ProductionVersionJan2020
+        55 : Symbol           = LLOYLN
+        48 : SecurityID       = 0870612
+        22 : IDSource         = 2
+       167 : SecurityType     = CS
+       207 : SecurityExchange = XLON
+        54 : Side             = 1
+        60 : TransactTime     = 20200302-11:14:36
+        38 : OrderQty         = 1000
+        40 : OrdType          = 2
+        44 : Price            = 59.73
+        15 : Currency         = GBP
+        59 : TimeInForce      = 0
+      8202                    = PCT
+      8204                    = ABS
+      8205                    = FAV
+      8206                    = ATS
 
 # Features
 
