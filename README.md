@@ -48,49 +48,51 @@ Example usage:
 
     head -1 test-data/messages.txt | nfix -s ';'
     2020/03/02-06:14:36,393 INFO :: TracingIncomingMessage[HFE_UAT_EQ_US]:
-        35 : MsgType          = D
-        49 : SenderCompID     = IREACH
-        56 : TargetCompID     = MLPT
-       115 : OnBehalfOfCompID = HARRISEUAP
-        34 : MsgSeqNum        = 988
-        52 : SendingTime      = 20200302-11:14:36.393
-     75205                    = 2
         11 : ClOrdID          = IREACH_t182_LLOYLN.nx83e.j#a1
-        63 : SettlmntTyp      = 0
+        15 : Currency         = GBP
         21 : HandlInst        = 2
-      6401                    = 45
-      6408                    = M
-      9682                    = BofAGlobalAlgoFixSpec_ProductionVersionJan2020
-        55 : Symbol           = LLOYLN
-        48 : SecurityID       = 0870612
         22 : IDSource         = 2
-       167 : SecurityType     = CS
-       207 : SecurityExchange = XLON
-        54 : Side             = 1
-        60 : TransactTime     = 20200302-11:14:36
+        34 : MsgSeqNum        = 988
+        35 : MsgType          = D
         38 : OrderQty         = 1000
         40 : OrdType          = 2
         44 : Price            = 59.73
-        15 : Currency         = GBP
+        48 : SecurityID       = 0870612
+        49 : SenderCompID     = IREACH
+        52 : SendingTime      = 20200302-11:14:36.393
+        54 : Side             = 1
+        55 : Symbol           = LLOYLN
+        56 : TargetCompID     = MLPT
         59 : TimeInForce      = 0
+        60 : TransactTime     = 20200302-11:14:36
+        63 : SettlmntTyp      = 0
+       115 : OnBehalfOfCompID = HARRISEUAP
+       167 : SecurityType     = CS
+       207 : SecurityExchange = XLON
+      6401                    = 45
+      6408                    = M
       8202                    = PCT
       8204                    = ABS
       8205                    = FAV
       8206                    = ATS
+      9682                    = BofAGlobalAlgoFixSpec_ProductionVersionJan2020
+     75205                    = 2
 
 # Features
 
 1. Parse data read on stdin, identify FIX messages and print one tag per line on stdout. Non-FIX message data is passed through unprocessed.
 2. Specify non-default field separator with the command line argument `-s`.
 3. Hide often irrelevant tags such as BeginString (8), BodyLength (9), CheckSum (10). Show all tags by explicitly passing command line argument `-a`.
+4. Sort tags numerical. Keep original ordering by passing the command line argument `-o`.
 
 # Roadmap
 
 1. Add tag names to parsed tags and enum names, etc.
 2. Group messages in order chains to display the lifecycle of each order (from the initial New Order Single messages to the final Execution Report.) These messages are often scattered across a log and interleaved with each other and can thus be quite hard to look at - a lot of jumping around based on ClOrdID (11) OrderID (37).
 3. Hide often irrelevant tags specific to a MsgType.
-4. Apply colours with some scheme to make it easier to read the FIX messages.
-5. Support custom FIX protocols by parsing the spec and generating a binary that "natively" understands e.g. custom tags.
+4. Avoid sorting fields in groups.
+5. Apply colours with some scheme to make it easier to read the FIX messages.
+6. Support custom FIX protocols by parsing the spec and generating a binary that "natively" understands e.g. custom tags.
 
 # Contributions
 

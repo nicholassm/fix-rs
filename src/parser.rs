@@ -211,13 +211,13 @@ mod tests {
 		parser.process(&mut &input[..], &mut output).unwrap();
 
 		insta::assert_snapshot!(to_str(&output), @r"
-		 8 : BeginString  = FIX.4.2
-		 9 : BodyLength   = 45
-		35 : MsgType      = D
-		49 : SenderCompID = SENDER
-		56 : TargetCompID = TARGET
-		10 : CheckSum     = 123
-		");
+		   8 : BeginString  = FIX.4.2
+		   9 : BodyLength   = 45
+		  10 : CheckSum     = 123
+		  35 : MsgType      = D
+		  49 : SenderCompID = SENDER
+		  56 : TargetCompID = TARGET
+		  ");
 	}
 
 	#[test]
@@ -242,13 +242,13 @@ mod tests {
 		parser.process(&mut &input[..], &mut output).unwrap();
 
 		insta::assert_snapshot!(to_str(&output), @r"
-		 8 : BeginString  = FIX.4.2
-		 9 : BodyLength   = 45
-		35 : MsgType      = D
-		49 : SenderCompID = SENDER
-		56 : TargetCompID = TARGET
-		10 : CheckSum     = 123
-		");
+ 		  8 : BeginString  = FIX.4.2
+ 		  9 : BodyLength   = 45
+ 		 10 : CheckSum     = 123
+ 		 35 : MsgType      = D
+ 		 49 : SenderCompID = SENDER
+ 		 56 : TargetCompID = TARGET
+ 		 ");
 	}
 
 	#[test]
@@ -277,10 +277,10 @@ mod tests {
 		2026-01-10 09:08:08.232 INFO Sending FIX: 
 		     8 : BeginString  = FIX.4.2
 		     9 : BodyLength   = 45
+		    10 : CheckSum     = 123
 		    35 : MsgType      = D
 		    49 : SenderCompID = SENDER
 		    56 : TargetCompID = TARGET
-		    10 : CheckSum     = 123
 		");
 	}
 	fn create_default_parser() -> Parser<SimpleFormatter<BaseDictionary, BaseFilter>> {

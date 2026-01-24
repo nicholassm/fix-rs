@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use crate::parser::FixError;
 
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Tag(u32);
 
 impl Display for Tag {

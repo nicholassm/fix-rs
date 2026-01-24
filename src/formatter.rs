@@ -9,28 +9,34 @@ pub trait FixFormatter: Default {
 
 #[derive(Debug, Default)]
 pub struct SimpleFormatter<D: Dictionary, F: Filter> {
-	show_all_fields: bool,
-	dictionary:      D,
-	filter:          F,
+	show_all_fields:       bool,
+	original_tag_ordering: bool,
+	dictionary:            D,
+	filter:                F,
 }
 
 impl<D: Dictionary, F: Filter> FixFormatter for SimpleFormatter<D, F> {
 	fn new(args: &Args) -> Self {
 		Self {
-			show_all_fields: args.show_all_fields,
-			dictionary:      D::default(),
-			filter:          F::default(),
+			show_all_fields:       args.show_all_fields,
+			original_tag_ordering: args.original_tag_ordering,
+			dictionary:            D::default(),
+			filter:                F::default(),
 		}
 	}
 
 	fn format(&self, message: &Message, output: &mut impl Write) -> std::io::Result<()> {
-		let fields = self.relevant_fields(message);
+		let mut fields = self.relevant_fields(message);
 
 		// Find max tag width for alignment of tag name.
 		let width = fields.iter()
 			.flat_map(|f| self.dictionary.tag_name(f.tag()).map(|name| name.len()))
 			.max()
 			.unwrap_or(0);
+
+		if !self.original_tag_ordering {
+			fields.sort_by(|f1, f2| f1.tag().cmp(&f2.tag()));
+		}
 
 		for field in fields {
 			let tag           = field.tag();
@@ -124,12 +130,12 @@ mod tests {
 		// Then:
 		let output_str = String::from_utf8(output).unwrap();
 		insta::assert_snapshot!(&output_str, @r"
-		 8 : BeginString  = FIX.4.2
-		 9 : BodyLength   = 45
-		35 : MsgType      = D
-		49 : SenderCompID = SENDER
-		56 : TargetCompID = TARGET
-		10 : CheckSum     = 123
-		");
+		   8 : BeginString  = FIX.4.2
+		   9 : BodyLength   = 45
+		  10 : CheckSum     = 123
+		  35 : MsgType      = D
+		  49 : SenderCompID = SENDER
+		  56 : TargetCompID = TARGET
+		  ");
 	}
 }
